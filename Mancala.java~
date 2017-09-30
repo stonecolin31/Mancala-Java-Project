@@ -1,0 +1,402 @@
+//Mancala main
+//Backup Version 12/7/16
+//New Version Corrupted or Lost
+import java.util.*;
+import java.io.*;
+
+public class Mancala
+{
+  private static String playerName;
+  private static Random rand = new Random();
+  private static int[] playBoard = new int[6];
+  private static int[] compBoard = new int[6];
+  private static int playStore = 45;
+  private static int compStore = 0;
+  private static boolean win = false;
+  private static topScores topScore = new topScores();
+  //main
+  public static void main(String[] args) throws IOException 
+  {
+    //declare variables
+    File highScores = new File("highScores.txt");
+    Scanner readLeader = new Scanner(highScores);
+    boolean keepGoing = false;
+    Scanner scan = new Scanner(System.in);
+    //greeting, getting player name
+    //Main Menu method call for player, wait till player initiates theyre ready to play
+    do{
+      Mancala.leaderBoardRead();
+      Mancala.greeting();
+      //play mancala game
+      Mancala.play();
+      //display winner,write to leaderboard if necessary
+      Mancala.winner();
+      int topScoreCheck = Mancala.leaderBoardSearch(playerName);
+      while (topScoreCheck != -1)
+      {
+        System.out.println("Congratulations "+playerName+"you are now number: "+topScoreCheck+"on the Mancala leaderboard!");
+        System.out.println("\nTop Scores List:");
+        while (readLeader.hasNext()) //***make a for loop for 5 iterations bcuz top score is going to have a temporary 6th slot for sorting****
+        { 
+          String temp = scan.nextLine();
+          System.out.println(temp); 
+        }
+        readLeader.close();
+      }
+      System.out.println("Would you like to return to the main menu?\n[1]:Yes\t[2]:No");
+        int returnCheck = scan.nextInt();
+      if (returnCheck == 1)
+        keepGoing = true;
+    }
+    while (keepGoing);
+    scan.close();
+    System.exit(0);
+  }//end main
+  
+  public static void leaderBoard() throws IOException 
+  {
+    //create and read in input File for top scores 
+    File highScores = new File("highScores.txt");
+    Scanner scan = new Scanner(highScores);
+    System.out.println("\nTop Scores List:");
+    while (scan.hasNext()) //***make a for loop for 5 iterations bcuz top score is going to have a temporary 6th slot for sorting****
+    { 
+      String temp = scan.nextLine();
+      System.out.println(temp); 
+    }
+    scan.close();
+  }// end leaderboard
+  
+  public static void greeting() throws IOException
+  {
+    String answer;
+    boolean ready = false;
+    Scanner scan = new Scanner(System.in);
+    System.out.println("Welcome to Mancala!");
+    //get player name for greeting and rest of game
+    //check if name is already on top scores list
+    do{
+      System.out.println("Please Enter Player Name: ");
+      playerName = scan.nextLine();
+      for (int i = 0; i<5; i++)
+      { if (playerName.compareToIgnoreCase(topScore.getName(i)) == 0)
+        {
+          System.out.println("Previous player has already used that name, please enter a different Name:");
+          ready = false;
+          break;
+        }
+        else
+          ready = true;
+      }
+    }while (!ready);
+    //set ready back to false for rest of method
+    ready = false;
+    System.out.println("Welcome " + playerName + "!");
+    do{
+      System.out.println("----------------------------------------------------------------------------------------------------------------------------------");
+      System.out.println("\t\t\t\tMain Menu:\nEnter corresponding # for the following choices:\n[1]: Play Mancala!\t[2]: LeaderBoard\t[3]: Leaderboard Search\t[4]: Learn how to play Mancala\t\t[5]: Exit Mancala");
+      int response = scan.nextInt();
+      scan.nextLine(); //had to add because of nextInt() not allowing nextLine() when asking for name to search
+      //monitor input and decide what to call based on input
+      if (response == 1)
+        ready = true;
+      else if (response == 2)
+        Mancala.leaderBoard();
+      else if (response == 3)
+      { System.out.println("Please enter the name you would like to search for: ");
+        answer = scan.nextLine();
+        int returnSearch = Mancala.leaderBoardSearch(answer);
+        if (returnSearch != -1)
+          System.out.println(answer + " is number "+(returnSearch+1)+" on the top scores list with a score of: "+topScore.getScore(returnSearch));
+        else
+          System.out.println(answer+" is not on the current top scores list.");
+      }
+      else if (response == 4)
+        Mancala.rules();
+      else if (response == 5)
+        System.exit(0);
+      else
+        ready = false;
+    } while(!ready);
+    scan.close();
+  }// end greeting
+  
+  public static void rules()throws IOException
+  {
+    //Explain rules **Add diagrams if there is time**
+    System.out.println("\t\t\t\tHOW TO PLAY MANCALA:");
+    System.out.println("[Objective:] \nHave the most \"stones\" in your mancala after all " + 
+                         "the stones on one side of the gameboard are captured.");
+    System.out.println("\n[Gameplay]:\nThe Mancala 'board' is made up of two rows of six holes or pits." + 
+                         "\nThe player and computer-player will be placed opposite each other with the gameboard in between.");
+    System.out.println("Each player places 4 \"stones\" in each of his 6 small cups to begin the game."+
+                         "Your scoring cup or store (a.k.a. mancala) is to your right.");
+    System.out.println("Player: " + playerName + " will start the game by choosing which pit to pick up and distribute the \"stones\" from on their side." + 
+                         "\nThe game will then deposit one stone into each hole moving to the right across the board until you are out of stones. " +  
+                         "\nIf you run into your own store, the game will deposit one stone in it. If you run into your opponent's store, the game will  skip it.");
+    System.out.println("\n[Special Moves:] \n1) If the last stone you drop is in your own store, you get a free turn." + 
+                         "\n2) If you place the last stone into an empty hole on your side of the board, all of the pieces in the hole directly across from it on your opponent's side of the board go into your store.");
+    System.out.println("\n[End of Game:] \nThe game continues with players alternating turns. \nAs soon as all the small six holes on one side of the board have been emptied, the game ends." + 
+                         "\nThe player with the most stones in their mancala wins the game.");
+  } //end rules
+  
+  public static void play()
+  {
+    //Play Mancala game
+    //declarations
+    Scanner scan = new Scanner(System.in);
+    //set boards to 4 at start
+    for (int i = 0; i<playBoard.length;i++)
+    { 
+      playBoard[i] = 0;
+      compBoard[i] = 4;
+    }
+    System.out.println("Player: " + playerName + " goes First!");
+    //displayBoard
+    Mancala.displayBoard();
+    //Ask player which pit they would like to move
+    //distribute stones across board from pit selected
+    do {
+    //Ask player which pit they would like to move
+    System.out.println("Enter pit selection([1-6]): ");
+    int selection = scan.nextInt();
+    //Create Random Move for Computer Selection
+    int randomMove = rand.nextInt(6)+1;
+    //distribute player move
+    System.out.println(playerName + "'s Move! Player Selects: Pit " + selection);
+    Mancala.distribute(playBoard, selection);
+    Mancala.displayBoard();
+    //distribute computer move
+    System.out.println("Computer's Move! Computer Selects: Pit " + randomMove);
+    Mancala.computerDistribute(compBoard, randomMove);
+    Mancala.displayBoard();
+    //check for winner on each turn aka if one array is all zeroes, winner check will return true if one side is all zeroes and break loop
+    win = Mancala.winnerCheck(playBoard, compBoard);
+    } while (!win);
+    scan.close();
+  } //end play
+  
+  public static void winner() throws IOException
+  {
+    //declare variables
+    String name = "";
+    int score = 0;
+    //add up points for both players at end of game with stones still left on either side
+    for (int i = 0; i<compBoard.length; i++)
+      compStore+=compBoard[i];
+    for (int i = 0; i<playBoard.length; i++)
+      playStore+=playBoard[i];
+    //Display winner
+    if (playStore>compStore)
+    { System.out.println(playerName + " Wins!");
+      //take in values for topScore board
+      name = playerName;
+      score = playStore;
+    }
+    else if (compStore>playStore)
+    { System.out.println("Computer Wins");
+      }
+    else
+    { System.out.println("Game ends in a Draw!");
+      win = false;
+      }
+    //display final scores
+    System.out.println("\t\t\tFinal Scores: ");
+    System.out.println("___________________________________________________________________________________");
+    System.out.println("|Comp Store\t|\t|\t|\t|\t|\t|Your Store\t");
+    System.out.println("|\t|    "+0+"\t|    "+0+"\t|    "+0+"\t|    "+0+"\t|    "+0+"\t|    "+0+"\t|\t|");
+    System.out.println("|\t|\t|\t|\t|\t|\t|\t|\t|");    
+    System.out.println("|    "+compStore+"\t|---------\t|---------\t|---------\t|---------\t|---------\t|---------\t|    "+playStore+"\t|");                     
+    System.out.println("|\t|\t|\t|\t|\t|\t|\t|\t|");
+    System.out.println("|\t|    "+0+"\t|    "+0+"\t|    "+0+"\t|    "+0+"\t|    "+0+"\t|    "+0+"\t|\t|");
+    System.out.println("|\t|\t|\t|\t|\t|\t|\t|\t|");
+    System.out.println("-----------------------------------------------------------------------------------");
+    System.out.println("\t   Pit:1\t   Pit:2\t   Pit:3\t   Pit:4\t   Pit:5\t   Pit:6");
+    //make call to leaderBoardSort to put new winning score in leaderBoard for writing if greater than any other values
+    Mancala.sort(topScore, name, score);
+    //thank them for playing and ask if they want to play again
+    
+  } //end winner
+  public static void displayBoard()
+  {
+    //System.out.println("\t\tComputer: ");
+    System.out.println("___________________________________________________________________________________");
+    System.out.println("|Comp Store\t|\t|\t|\t|\t|\t|Your Store\t");
+    System.out.println("|\t|    "+compBoard[0]+"\t|    "+compBoard[1]+"\t|    "+compBoard[2]+"\t|    "+compBoard[3]+"\t|    "+compBoard[4]+"\t|    "+compBoard[5]+"\t|\t|");
+    System.out.println("|\t|\t|\t|\t|\t|\t|\t|\t|");    
+    System.out.println("|    "+compStore+"\t|---------\t|---------\t|---------\t|---------\t|---------\t|---------\t|    "+playStore+"\t|");                     
+    System.out.println("|\t|\t|\t|\t|\t|\t|\t|\t|");
+    System.out.println("|\t|    "+playBoard[0]+"\t|    "+playBoard[1]+"\t|    "+playBoard[2]+"\t|    "+playBoard[3]+"\t|    "+playBoard[4]+"\t|    "+playBoard[5]+"\t|\t|");
+    System.out.println("|\t|\t|\t|\t|\t|\t|\t|\t|");
+    System.out.println("-----------------------------------------------------------------------------------");
+    System.out.println("\t   Pit:1\t   Pit:2\t   Pit:3\t   Pit:4\t   Pit:5\t   Pit:6");
+  } //end displayBoard
+  public static int[] distribute(int[] array, int selection) //working
+  {
+    //take selection in array and sitribute it across board
+    int arrayNum = selection - 1;
+    //get number of Moves or stone in hand
+    int numStones = array[arrayNum];
+    //empty selected pit
+    array[arrayNum] = 0;
+    //while there is marbles in your hand and while still space in array, add plus 1 to array values until end of array or end of marbles
+    while(numStones >0 && (array.length-selection)>0)
+    {
+      for (int i = selection; i<selection+1; i++)
+        array[i]++;
+      //drop 1 stone in pit
+      numStones--;
+      //move to next pit to start over
+      selection = selection+1;
+    }
+    //if still stones left, add 1 to store
+    //while loop, ++ to each array element from beginning of array for numStones left after adding 1 to store
+    while(numStones >0) //&& Math.abs(array.length-numStones)>=0)
+    {
+      //if still stones left, add 1 to store if at last slot in array then go back to beginning
+      if (numStones>0 && selection== 6)
+      { playStore++;
+        numStones--;
+        selection = 0;}
+      else{
+        for(int i = selection; i<selection+1; i++)
+          array[i]++;
+        numStones--;
+        selection = selection+1;
+      }
+    }
+    return array;
+  } //end distribute
+ 
+  public static int[] computerDistribute(int[] array, int selection) //working for complete loop around
+  {
+    //take selection in array and sitribute it across board
+    int arrayNum = selection - 1;
+    //get number of Moves or stone in hand
+    int numStones = array[arrayNum];
+    //empty selected pit
+    array[arrayNum] = 0;
+    //while there is marbles in your hand and while still space in array, add plus 1 to array values until end of array or end of marbles
+    while(numStones >0 && arrayNum-1 >= 0)
+    {
+      for (int i = arrayNum-1; i > arrayNum-2 ; i--)
+        array[i]++; 
+      //drop 1 stone in pit
+      numStones--;
+      //move to next pit to start over
+      arrayNum = arrayNum-1;
+    }
+    if (numStones>0 && arrayNum == 0 ){
+      numStones--;
+      compStore++;}
+    arrayNum = array.length-1;
+    //while loop, ++ to each array element from beginning of array for numStones left after adding 1 to store
+    while(numStones>0)
+    {
+      if(numStones > 0 && arrayNum == -1)
+      { compStore++;
+        numStones--;
+        arrayNum = array.length-1;}
+      else 
+      {
+        for(int i=arrayNum; i>arrayNum-1; i--)
+          array[i]++;
+        numStones--;
+        arrayNum = arrayNum-1;
+      }
+    }
+    return array;
+  }// end computer distribute
+ 
+  public static boolean winnerCheck(int[] playerBoard, int[] computerBoard)
+  {
+    boolean checkWin = false;
+    int playCount = 0;
+    int compCount = 0;
+    for (int i = 0; i<6; i++)
+    {
+      if (playerBoard[i] == 0)
+        playCount++;
+    }
+    for (int i = 0; i<6; i++)
+    {
+      if (computerBoard[i] == 0)
+        compCount++;
+    }
+    if (playCount == 6 || compCount == 6)
+      checkWin = true;
+    return checkWin;
+  } // end winnerCheck
+  public static void leaderBoardRead() throws IOException
+  {
+    int i = 0;
+    String tempName;
+    int tempScore;
+    File inputFile = new File("highScores.txt");
+    Scanner scan = new Scanner(inputFile);
+    while (scan.hasNext())
+    { tempName = scan.next();
+      tempScore = scan.nextInt();
+      topScore.setName(i, tempName);
+      topScore.setScore(i, tempScore);
+      i++;
+    }
+    scan.close();
+  }// end winnerCheck
+  
+  public static int leaderBoardSearch(String target) throws IOException //WORKING
+  {
+    Mancala.leaderBoardRead();
+    int index = -1;
+     //search for playerStore greater than high score recorded value
+    for (int i = 0; i<5; i++)
+    {
+      int nameCheck = (target.compareToIgnoreCase(topScore.getName(i)));
+      if (nameCheck == 0)
+      { //replace the value when greater value found and shift all scores indexes down one
+        index = i;
+        break;
+      }
+      else 
+        index = -1;
+      }
+     return index;
+  }
+  public static void sort(topScores t, String n, int s)
+  {
+    //make topScore Strings and names 6 space arrrays so that 6 can read in new score and compare it with next 
+    //select sort all six 
+    System.out.println("Sorting Top Scores.....");
+    int tempSpot = 5;
+    System.out.println("Setting score");
+    t.setScore(tempSpot, s);
+    System.out.println("Setting name");
+    t.setName(tempSpot, n);
+    int min, temp;
+    System.out.println("Starting for");
+    for (int startIndex = 0; startIndex<5; startIndex++)
+    {
+      min = startIndex;
+      System.out.println("For loop starting");
+      for (int i = startIndex + 1; i<5; i++)
+      {
+        
+        System.out.println("Comparing score to new score. StartIndex:"+startIndex+" i:"+i);
+        if(t.getScore(i) < t.getScore(tempSpot))
+        {
+          System.out.println("New Score is greater than current, swapping: "+t.getScore(tempSpot)+" with :"+t.getScore(i));
+          min = i;
+        }
+        temp = t.getScore(min);
+      t.setScore(min, t.getScore(startIndex));
+      t.setScore(startIndex, temp);
+      }
+      //temp = t.getScore(min);
+      //t.setScore(min, t.getScore(startIndex));
+      //t.setScore(startIndex, temp);
+    }
+  }
+  public static void printSorted(topScores t) //printSorted array to a file
+  {
+  }
+}
